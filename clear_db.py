@@ -13,9 +13,11 @@ conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 cursor.execute("DELETE FROM transactions")
 txn_count = cursor.rowcount
+cursor.execute("DELETE FROM login_events")
+event_count = cursor.rowcount
 cursor.execute("DELETE FROM users")
 user_count = cursor.rowcount
 conn.commit()
 conn.close()
 
-print(f"Database cleared! Removed {user_count} users and {txn_count} transactions.")
+print(f"Database cleared! Removed {user_count} users, {txn_count} transactions and {event_count} login events.")

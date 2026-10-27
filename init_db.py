@@ -16,6 +16,7 @@ def init_db(reset=False):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     if reset:
+        c.execute("DROP TABLE IF EXISTS login_events")
         c.execute("DROP TABLE IF EXISTS transactions")
         c.execute("DROP TABLE IF EXISTS users")
     c.executescript("""
@@ -29,7 +30,18 @@ def init_db(reset=False):
         pincode         TEXT,
         balance         REAL DEFAULT 100000,
         balance_pin     TEXT,
+        status          TEXT DEFAULT 'active',
         created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS login_events (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        card_number     TEXT,
+        email           TEXT,
+        event           TEXT,
+        ip_address      TEXT,
+        user_agent      TEXT,
+        timestamp       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS transactions (
@@ -51,6 +63,10 @@ def init_db(reset=False):
     # Migration for databases created before the balance PIN feature.
     try:
         conn.execute("ALTER TABLE users ADD COLUMN balance_pin TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'")
     except sqlite3.OperationalError:
         pass  # Column already exists
     conn.commit()

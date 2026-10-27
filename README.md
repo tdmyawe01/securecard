@@ -43,6 +43,29 @@ Then open http://127.0.0.1:5000
 Register with a card number, email, pincode, strong password, and a 4–6 digit
 balance PIN. The balance is hidden on the dashboard until you enter that PIN.
 
+## Admin panel
+
+Open `/admin` and sign in with the admin username/password from the
+environment (`ADMIN_USERNAME`, default `admin`, and `ADMIN_PASSWORD`).
+The panel is disabled until `ADMIN_PASSWORD` is set — there is no default
+admin password, and it is never stored in the repo.
+
+The admin panel shows, for all users:
+- Totals: users, active users, transactions, approved/blocked counts and
+  amounts, successful/failed logins, new users in the last 7 days
+- Who created an account, who logged in (and when, from which IP), and
+  who failed to log in — in the `login_events` table
+- All transactions, with search by card number or email, and the top
+  block reasons
+- Per-user actions: deactivate (blocks login), reactivate, or delete
+  (user + their transactions + login events)
+- CSV exports for users, transactions, and login events
+
+Accounts are saved in SQLite, so a user who registers can log in directly
+next time on the same deployment. On Render's free tier, the local SQLite
+file resets on redeploy/restart — for permanent accounts across redeploys,
+move to Postgres or a paid Render Disk.
+
 ## Notes
 
 - This is a demo, not a production banking system. The ML features are

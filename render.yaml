@@ -13,6 +13,12 @@ services:
     envVars:
       - key: FLASK_SECRET_KEY
         generateValue: true
+      - key: ADMIN_USERNAME
+        value: admin
+      # Admin password: set this in Render > Environment (sync: false means
+      # Render will prompt for it, it is not stored in the repo).
+      - key: ADMIN_PASSWORD
+        sync: false
       # Optional, only for fraud-alert emails; use a fresh app password,
       # never the one exposed in the original upload.
       # - key: SENDER_EMAIL

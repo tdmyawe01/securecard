@@ -1,7 +1,9 @@
 from geopy.geocoders import Nominatim
 geolocator = Nominatim(user_agent="credit_card_v2")
 
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, Response
+import csv, io, hmac
+from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import joblib
@@ -41,6 +43,8 @@ model = joblib.load(os.path.join(BASE_DIR, "credit_card_model.pkl"))
 
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "")
 SENDER_PASS = os.environ.get("SENDER_PASS", "")
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")  # Set in Render env vars; never commit a real value.
 
 # ─── DB SETUP ────────────────────────────────────────────────────────────────
 def get_conn():
@@ -62,7 +66,18 @@ def init_db():
             pincode         TEXT,
             balance         REAL    DEFAULT 100000,
             balance_pin     TEXT,
+            status          TEXT    DEFAULT 'active',
             created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS login_events (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            card_number     TEXT,
+            email           TEXT,
+            event           TEXT,
+            ip_address      TEXT,
+            user_agent      TEXT,
+            timestamp       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
         CREATE TABLE IF NOT EXISTS transactions (
@@ -82,6 +97,11 @@ def init_db():
         );
     """)
     conn.commit()
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'")
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
     # Migration: add balance_pin column if it doesn't exist (for existing databases)
     try:
         conn.execute("ALTER TABLE users ADD COLUMN balance_pin TEXT")
@@ -110,6 +130,31 @@ def check_pw(pw, stored):
 
 def _needs_rehash(stored):
     return not (stored or "").startswith(("pbkdf2:", "scrypt:"))
+
+def mask_card(card):
+    card = str(card or "")
+    return "****" + card[-4:] if len(card) >= 4 else "****"
+
+def log_event(card, email, event):
+    try:
+        conn = get_conn()
+        conn.execute(
+            "INSERT INTO login_events (card_number, email, event, ip_address, user_agent) VALUES (?,?,?,?,?)",
+            (card, email, event, request.remote_addr,
+             (request.headers.get("User-Agent") or "")[:200])
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print("Event log error:", e)
+
+def admin_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not session.get("admin"):
+            return redirect(url_for("admin_page"))
+        return f(*args, **kwargs)
+    return wrapper
 
 def validate_password(pw):
     errs = []
@@ -376,19 +421,28 @@ def login():
     card = str(d.get('card_number','')).strip()
     pw   = str(d.get('password','')).strip()
     user = get_user(card)
+    if user and user["status"] not in (None, "active"):
+        log_event(card, user["email"], "login_blocked_deactivated")
+        return jsonify({"status":"fail","message":"Account deactivated by admin"})
     if user and check_pw(pw, user["password_hash"]):
         if _needs_rehash(user["password_hash"]):
             conn = get_conn()
             conn.execute("UPDATE users SET password_hash=? WHERE card_number=?", (hash_pw(pw), card))
             conn.commit()
             conn.close()
+        log_event(card, user["email"], "login_success")
         session['card']  = card
         session['email'] = user["email"]
         return jsonify({"status":"success"})
+    log_event(card, user["email"] if user else "", "login_failed")
     return jsonify({"status":"fail","message":"Invalid card number or password"})
 
 @app.route('/logout')
 def logout():
+    if session.get("card"):
+        log_event(session.get("card"), session.get("email", ""), "logout")
+    if session.get("admin"):
+        log_event("ADMIN", "admin", "admin_logout")
     session.clear()
     return redirect(url_for('login_page'))
 
@@ -410,7 +464,115 @@ def register():
     if not re.match(r'^\d{4,6}$', balance_pin):
         return jsonify({"message":"Balance PIN must be 4–6 digits", "success":False})
     ok, msg = insert_user(d['card_number'], d['email'], pw, d['pincode'], balance_pin)
+    if ok:
+        log_event(d['card_number'], d['email'], "account_created")
     return jsonify({"message": msg, "success": ok})
+
+
+# ─── ADMIN PANEL ──────────────────────────────────────────────────────────────
+@app.route('/admin')
+def admin_page():
+    if not session.get("admin"):
+        return render_template("admin_login.html", admin_configured=bool(ADMIN_PASSWORD))
+    q = (request.args.get("q") or "").strip()
+    conn = get_conn()
+    stats = {}
+    stats["total_users"] = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    stats["active_users"] = conn.execute("SELECT COUNT(*) FROM users WHERE status IS NULL OR status='active'").fetchone()[0]
+    stats["total_txns"] = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+    stats["approved"] = conn.execute("SELECT COUNT(*) FROM transactions WHERE status='Approved'").fetchone()[0]
+    stats["blocked"] = conn.execute("SELECT COUNT(*) FROM transactions WHERE status='Blocked'").fetchone()[0]
+    stats["approved_amount"] = conn.execute("SELECT COALESCE(SUM(amount),0) FROM transactions WHERE status='Approved'").fetchone()[0]
+    stats["blocked_amount"] = conn.execute("SELECT COALESCE(SUM(amount),0) FROM transactions WHERE status='Blocked'").fetchone()[0]
+    stats["total_logins"] = conn.execute("SELECT COUNT(*) FROM login_events WHERE event='login_success'").fetchone()[0]
+    stats["failed_logins"] = conn.execute("SELECT COUNT(*) FROM login_events WHERE event='login_failed'").fetchone()[0]
+    stats["new_users_7d"] = conn.execute("SELECT COUNT(*) FROM users WHERE created_at >= datetime('now','-7 days')").fetchone()[0]
+    fraud_reasons = conn.execute(
+        "SELECT reason, COUNT(*) AS c FROM transactions WHERE status='Blocked' GROUP BY reason ORDER BY c DESC LIMIT 10"
+    ).fetchall()
+    if q:
+        like = "%" + q + "%"
+        users = conn.execute(
+            "SELECT * FROM users WHERE card_number LIKE ? OR email LIKE ? ORDER BY created_at DESC LIMIT 50",
+            (like, like)).fetchall()
+        txns = conn.execute(
+            "SELECT * FROM transactions WHERE card_number LIKE ? ORDER BY timestamp DESC LIMIT 50",
+            (like,)).fetchall()
+        logins = conn.execute(
+            "SELECT * FROM login_events WHERE card_number LIKE ? OR email LIKE ? ORDER BY timestamp DESC LIMIT 50",
+            (like, like)).fetchall()
+    else:
+        users = conn.execute("SELECT * FROM users ORDER BY created_at DESC LIMIT 20").fetchall()
+        txns = conn.execute("SELECT * FROM transactions ORDER BY timestamp DESC LIMIT 50").fetchall()
+        logins = conn.execute("SELECT * FROM login_events ORDER BY timestamp DESC LIMIT 50").fetchall()
+    conn.close()
+    def to_dict(row):
+        d = dict(row); d["masked"] = mask_card(d.get("card_number", ""))
+        return d
+    return render_template("admin.html",
+        stats=stats, users=[to_dict(r) for r in users],
+        txns=[to_dict(r) for r in txns], logins=[to_dict(r) for r in logins],
+        fraud_reasons=fraud_reasons, q=q, admin_user=ADMIN_USERNAME)
+
+@app.route('/admin/login', methods=['POST'])
+def admin_login():
+    if not ADMIN_PASSWORD:
+        return jsonify({"success": False, "message": "Admin not configured. Set ADMIN_PASSWORD in the environment (Render > Environment)."}), 503
+    d = request.json or {}
+    if d.get("username") == ADMIN_USERNAME and hmac.compare_digest(str(d.get("password", "")), ADMIN_PASSWORD):
+        log_event("ADMIN", "admin", "admin_login_success")
+        session["admin"] = True
+        return jsonify({"success": True})
+    log_event("ADMIN", "admin", "admin_login_failed")
+    return jsonify({"success": False, "message": "Invalid admin credentials"}), 401
+
+@app.route('/admin/logout')
+def admin_logout():
+    log_event("ADMIN", "admin", "admin_logout")
+    session.pop("admin", None)
+    return redirect(url_for("admin_page"))
+
+@app.route('/admin/user_action', methods=['POST'])
+@admin_required
+def admin_user_action():
+    card = request.form.get("card", "").strip()
+    action = request.form.get("action", "").strip()
+    conn = get_conn()
+    if action == "deactivate":
+        conn.execute("UPDATE users SET status='deactivated' WHERE card_number=?", (card,))
+        log_event(card, "admin", "admin_deactivate")
+    elif action == "reactivate":
+        conn.execute("UPDATE users SET status='active' WHERE card_number=?", (card,))
+        log_event(card, "admin", "admin_reactivate")
+    elif action == "delete":
+        conn.execute("DELETE FROM transactions WHERE card_number=?", (card,))
+        conn.execute("DELETE FROM login_events WHERE card_number=?", (card,))
+        conn.execute("DELETE FROM users WHERE card_number=?", (card,))
+        log_event(card, "admin", "admin_delete")
+    conn.commit(); conn.close()
+    return redirect(url_for("admin_page"))
+
+@app.route('/admin/export')
+@admin_required
+def admin_export():
+    kind = request.args.get("type", "users")
+    conn = get_conn()
+    out = io.StringIO(); w = csv.writer(out)
+    if kind == "transactions":
+        w.writerow(["id", "card_number", "amount", "txn_type", "status", "reason", "balance_before", "balance_after", "distance", "ml_prediction", "ml_probability", "fraud_flags", "timestamp"])
+        for r in conn.execute("SELECT * FROM transactions ORDER BY timestamp DESC"):
+            w.writerow([r["id"], r["card_number"], r["amount"], r["txn_type"], r["status"], r["reason"], r["balance_before"], r["balance_after"], r["distance"], r["ml_prediction"], r["ml_probability"], r["fraud_flags"], r["timestamp"]])
+    elif kind == "logins":
+        w.writerow(["id", "card_number", "email", "event", "ip_address", "user_agent", "timestamp"])
+        for r in conn.execute("SELECT * FROM login_events ORDER BY timestamp DESC"):
+            w.writerow([r["id"], r["card_number"], r["email"], r["event"], r["ip_address"], r["user_agent"], r["timestamp"]])
+    else:
+        w.writerow(["id", "card_number", "email", "pincode", "balance", "status", "created_at"])
+        for r in conn.execute("SELECT * FROM users ORDER BY created_at DESC"):
+            w.writerow([r["id"], r["card_number"], r["email"], r["pincode"], r["balance"], r["status"], r["created_at"]])
+    conn.close()
+    return Response(out.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename=securecard_{kind}.csv"})
 
 @app.route('/me')
 def me():
