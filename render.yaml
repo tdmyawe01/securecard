@@ -1,0 +1,21 @@
+# Render deployment for the clean public copy of SecureCard.
+# Deploy from this directory (or connect the repo containing it) and Render
+# will use the commands and generated secret below.
+# NOTE: on Render's free tier the filesystem is ephemeral, so users.db
+# (SQLite) resets on redeploy/restart. That is fine for a demo, but a
+# persistent demo needs a Render Disk (paid) or moving the DB to Postgres.
+services:
+  - type: web
+    name: securecard
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      # Optional, only for fraud-alert emails; use a fresh app password,
+      # never the one exposed in the original upload.
+      # - key: SENDER_EMAIL
+      #   sync: false
+      # - key: SENDER_PASS
+      #   sync: false
