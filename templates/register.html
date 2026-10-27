@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>SecureCard — Register</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #050a14;
+  --card: #0c1628;
+  --border: #1a2d50;
+  --accent: #00d4ff;
+  --accent2: #0066ff;
+  --danger: #ff4560;
+  --success: #00e096;
+  --text: #e2eaf7;
+  --muted: #5a7a9e;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  font-family: 'Sora', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--text);
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  z-index: 0;
+}
+
+.orb {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.12;
+  z-index: 0;
+  animation: drift 8s ease-in-out infinite alternate;
+}
+.orb1 { width: 500px; height: 500px; background: var(--accent2); top: -150px; right: -100px; }
+.orb2 { width: 350px; height: 350px; background: var(--success); bottom: -100px; left: -80px; animation-delay: -3s; }
+
+@keyframes drift {
+  from { transform: translate(0, 0); }
+  to { transform: translate(20px, 30px); }
+}
+
+.panel {
+  position: relative;
+  z-index: 1;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 40px;
+  width: 420px;
+  box-shadow: 0 0 60px rgba(0,212,255,0.07), 0 30px 60px rgba(0,0,0,0.6);
+  animation: slideUp 0.6s cubic-bezier(0.16,1,0.3,1);
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.logo-icon {
+  width: 42px; height: 42px;
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+
+.logo-text {
+  font-family: 'Space Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.logo-text span { color: var(--accent); }
+
+h2 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+.subtitle { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+
+.field { margin-bottom: 14px; }
+
+label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+input {
+  width: 100%;
+  padding: 11px 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: 'Sora', sans-serif;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+
+input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0,212,255,0.1);
+}
+
+input::placeholder { color: var(--muted); }
+
+/* Password strength indicator */
+.pw-rules {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.rule {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--muted);
+  transition: color 0.2s;
+}
+
+.rule.ok { color: var(--success); }
+.rule-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); transition: background 0.2s; }
+.rule.ok .rule-dot { background: var(--success); }
+
+.pw-bar {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.pw-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 2px;
+  transition: width 0.3s, background 0.3s;
+}
+
+.btn {
+  width: 100%;
+  padding: 13px;
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  margin-top: 10px;
+}
+
+.btn:hover { opacity: 0.9; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.alert {
+  margin-top: 12px;
+  padding: 11px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  display: none;
+  line-height: 1.5;
+}
+
+.alert-error { background: rgba(255,69,96,0.1); border: 1px solid rgba(255,69,96,0.3); color: var(--danger); }
+.alert-success { background: rgba(0,224,150,0.1); border: 1px solid rgba(0,224,150,0.3); color: var(--success); }
+
+.footer-link {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.footer-link a { color: var(--accent); text-decoration: none; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<div class="panel">
+  <div class="logo">
+    <div class="logo-icon">🛡️</div>
+    <div class="logo-text">Secure<span>Card</span></div>
+  </div>
+
+  <h2>Create Account</h2>
+  <p class="subtitle">Register your card for fraud protection</p>
+
+  <div class="field">
+    <label>Card Number</label>
+    <input type="text" id="card" placeholder="16-digit card number" maxlength="19">
+  </div>
+
+  <div class="field">
+    <label>Email Address</label>
+    <input type="email" id="email" placeholder="your@email.com">
+  </div>
+
+  <div class="field">
+    <label>Home Pincode</label>
+    <input type="text" id="pincode" placeholder="Enter your area pincode">
+  </div>
+
+  <div class="field">
+    <label>Password</label>
+    <input type="password" id="password" oninput="checkPassword(this.value)" placeholder="Create a strong password">
+    <div class="pw-bar"><div class="pw-fill" id="pwFill"></div></div>
+    <div class="pw-rules">
+      <div class="rule" id="r-len"><div class="rule-dot"></div>8+ characters</div>
+      <div class="rule" id="r-upper"><div class="rule-dot"></div>Uppercase</div>
+      <div class="rule" id="r-lower"><div class="rule-dot"></div>Lowercase</div>
+      <div class="rule" id="r-num"><div class="rule-dot"></div>Number</div>
+      <div class="rule" id="r-special"><div class="rule-dot"></div>Special char</div>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Confirm Password</label>
+    <input type="password" id="confirm" placeholder="Repeat your password">
+  </div>
+
+  <div class="field">
+    <label>Balance PIN <span style="color:var(--accent);font-size:9px;letter-spacing:1px">(4–6 DIGITS · TO VIEW BALANCE)</span></label>
+    <input type="password" id="balance_pin" placeholder="Choose a 4–6 digit PIN" maxlength="6" inputmode="numeric" pattern="\d{4,6}">
+    <div style="margin-top:5px;font-size:11px;color:var(--muted)">🔒 You'll need this PIN to reveal your balance on the dashboard</div>
+  </div>
+
+  <button class="btn" id="submitBtn" onclick="register()">→ CREATE ACCOUNT</button>
+
+  <div class="alert" id="msg"></div>
+
+  <div class="footer-link">
+    Already registered? <a href="/">Sign in</a>
+  </div>
+</div>
+
+<script>
+const rules = {
+  'r-len':     pw => pw.length >= 8,
+  'r-upper':   pw => /[A-Z]/.test(pw),
+  'r-lower':   pw => /[a-z]/.test(pw),
+  'r-num':     pw => /\d/.test(pw),
+  'r-special': pw => /[!@#$%^&*(),.?":{}|<>]/.test(pw),
+};
+
+const strengthColors = ['#ff4560','#ff6b00','#ffd700','#00d4ff','#00e096'];
+
+function checkPassword(pw) {
+  let passed = 0;
+  for (const [id, fn] of Object.entries(rules)) {
+    const ok = fn(pw);
+    document.getElementById(id).classList.toggle('ok', ok);
+    if (ok) passed++;
+  }
+  const fill = document.getElementById('pwFill');
+  fill.style.width = (passed / 5 * 100) + '%';
+  fill.style.background = strengthColors[passed - 1] || 'var(--border)';
+}
+
+async function register() {
+  const card = document.getElementById('card').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const pincode = document.getElementById('pincode').value.trim();
+  const password = document.getElementById('password').value;
+  const confirm = document.getElementById('confirm').value;
+  const balance_pin = document.getElementById('balance_pin').value.trim();
+  const msgEl = document.getElementById('msg');
+
+  msgEl.style.display = 'none';
+
+  if (!card || !email || !pincode || !password || !confirm || !balance_pin) {
+    showMsg('Please fill in all fields.', false);
+    return;
+  }
+
+  if (!/^\d{4,6}$/.test(balance_pin)) {
+    showMsg('Balance PIN must be 4–6 digits only.', false);
+    return;
+  }
+
+  const btn = document.getElementById('submitBtn');
+  btn.textContent = 'Creating account...';
+  btn.disabled = true;
+
+  const res = await fetch('/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ card_number: card, email, pincode, password, confirm_password: confirm, balance_pin })
+  });
+
+  const data = await res.json();
+  btn.textContent = '→ CREATE ACCOUNT';
+  btn.disabled = false;
+
+  showMsg(data.message, data.success);
+
+  if (data.success) {
+    setTimeout(() => window.location.href = '/', 1800);
+  }
+}
+
+function showMsg(text, success) {
+  const el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = 'alert ' + (success ? 'alert-success' : 'alert-error');
+  el.style.display = 'block';
+}
+</script>
+</body>
+</html>

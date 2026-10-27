@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fraud Detection System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            margin: 0;
+        }
+
+        header {
+            background: #1e3a8a;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 24px;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 900px;
+            margin: 30px auto;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #1e3a8a;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #2563eb;
+        }
+
+        .result {
+            margin-top: 15px;
+            font-weight: bold;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    💳 Credit Card Fraud Detection System
+</header>
+
+<div class="container">
+
+    <!-- REGISTER -->
+    <div class="card">
+        <h2>Register User</h2>
+        <form id="registerForm">
+            <input type="text" id="card" placeholder="Enter Card Number" required>
+            <input type="email" id="email" placeholder="Enter Email Address" required>
+            <button type="submit">Register</button>
+        </form>
+        <div id="regResult" class="result"></div>
+    </div>
+
+    <!-- TRANSACTION -->
+    <div class="card">
+        <h2>Transaction Check</h2>
+        <form id="txnForm">
+            <input type="text" id="card2" placeholder="Enter Card Number" required>
+            <input type="number" id="amount" placeholder="Enter Amount" required>
+            <button type="submit">Check Transaction</button>
+        </form>
+        <div id="result" class="result"></div>
+    </div>
+
+</div>
+
+<script>
+// ---------------- REGISTER ----------------
+document.getElementById("registerForm").onsubmit = async (e)=>{
+    e.preventDefault();
+
+    navigator.geolocation.getCurrentPosition(async (pos)=>{
+
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+
+        const res = await fetch("/register", {
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({
+                card_number: document.getElementById("card").value,
+                email: document.getElementById("email").value,
+                lat: lat,
+                lon: lon
+            })
+        });
+
+        const data = await res.json();
+
+        const el = document.getElementById("regResult");
+        el.innerText = data.message;
+        el.className = "result success";
+
+    }, ()=>{
+        alert("Location permission denied!");
+    });
+};
+
+
+// ---------------- TRANSACTION ----------------
+document.getElementById("txnForm").onsubmit = async (e)=>{
+    e.preventDefault();
+
+    navigator.geolocation.getCurrentPosition(async (pos)=>{
+
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+
+        const res = await fetch("/predict", {
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({
+                card_number: document.getElementById("card2").value,
+                step:1,
+                type:"TRANSFER",
+                amount: document.getElementById("amount").value,
+                oldbalanceOrg:5000,
+                newbalanceOrig:4000,
+                oldbalanceDest:0,
+                newbalanceDest:1000,
+                isFlaggedFraud:0,
+                lat: lat,
+                lon: lon
+            })
+        });
+
+        const data = await res.json();
+
+        const el = document.getElementById("result");
+        el.innerText = data.status + " → " + data.reason;
+
+        // 🎨 dynamic colors
+        if(data.status === "Normal"){
+            el.className = "result success";
+        } else if(data.status === "Suspicious"){
+            el.className = "result warning";
+        } else {
+            el.className = "result error";
+        }
+
+    }, ()=>{
+        alert("Location permission denied!");
+    });
+};
+</script>
+
+</body>
+</html>

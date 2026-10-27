@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>SecureCard — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#050a14; --surface:#0c1628; --surface2:#101d35;
+  --border:#1a2d50; --accent:#00d4ff; --accent2:#0066ff;
+  --danger:#ff4560; --success:#00e096; --warn:#ffb800;
+  --text:#e2eaf7; --muted:#5a7a9e;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);font-family:'Sora',sans-serif;min-height:100vh;color:var(--text)}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:58px;background:rgba(5,10,20,.9);border-bottom:1px solid var(--border);backdrop-filter:blur(20px)}
+.nav-logo{display:flex;align-items:center;gap:10px;font-family:'Space Mono',monospace;font-weight:700;font-size:15px;letter-spacing:1px}
+.nav-logo span{color:var(--accent)}
+.nav-right{display:flex;align-items:center;gap:14px}
+.card-badge{font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);padding:5px 12px;border-radius:6px}
+.logout-btn{font-size:12px;color:var(--muted);text-decoration:none;padding:5px 12px;border:1px solid var(--border);border-radius:6px;transition:color .2s,border-color .2s}
+.logout-btn:hover{color:var(--danger);border-color:var(--danger)}
+
+.main{position:relative;z-index:1;max-width:960px;margin:32px auto;padding:0 20px;display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+
+/* Stats row */
+.stats-row{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;animation:fadeUp .5s ease both}
+.stat-card:nth-child(2){animation-delay:.07s}.stat-card:nth-child(3){animation-delay:.14s}.stat-card:nth-child(4){animation-delay:.21s}
+.stat-label{font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.stat-value{font-family:'Space Mono',monospace;font-size:24px;font-weight:700}
+.stat-value.blue{color:var(--accent)}.stat-value.green{color:var(--success)}.stat-value.red{color:var(--danger)}.stat-value.gold{color:var(--warn)}
+
+/* Panels */
+.txn-panel,.history-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:26px;animation:fadeUp .5s ease .2s both}
+.history-panel{animation-delay:.3s}
+.panel-title{font-size:15px;font-weight:700;margin-bottom:4px}
+.panel-sub{font-size:12px;color:var(--muted);margin-bottom:20px}
+.panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+
+.field{margin-bottom:13px}
+label{display:block;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+input,select{width:100%;padding:10px 13px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;font-family:'Sora',sans-serif;outline:none;transition:border-color .2s}
+select option{background:var(--surface)}
+input:focus,select:focus{border-color:var(--accent)}
+input::placeholder{color:var(--muted)}
+
+.btn{width:100%;padding:12px;background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff;border:none;border-radius:10px;font-family:'Space Mono',monospace;font-size:13px;font-weight:700;letter-spacing:1px;cursor:pointer;transition:opacity .2s;margin-top:4px}
+.btn:hover{opacity:.9}.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* Result box */
+.result-box{margin-top:14px;padding:16px;border-radius:10px;display:none;animation:fadeUp .4s ease}
+.result-ok{background:rgba(0,224,150,.08);border:1px solid rgba(0,224,150,.3);color:var(--success)}
+.result-fail{background:rgba(255,69,96,.08);border:1px solid rgba(255,69,96,.3);color:var(--danger)}
+.result-status{font-size:16px;font-weight:700;margin-bottom:4px}
+.result-reason{font-size:12px;opacity:.8;margin-bottom:10px}
+.ml-bar-wrap{margin-top:10px}
+.ml-bar-label{font-size:10px;letter-spacing:1px;text-transform:uppercase;opacity:.6;margin-bottom:4px}
+.ml-bar-bg{height:5px;background:rgba(255,255,255,.1);border-radius:3px}
+.ml-bar-fill{height:100%;border-radius:3px;transition:width .6s ease}
+.flags-list{margin-top:10px;padding:0;list-style:none}
+.flags-list li{font-size:11px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06);opacity:.85}
+.flags-list li:last-child{border:none}
+.flags-list li::before{content:"⚠ ";opacity:.7}
+
+/* Transaction history */
+.txn-list{margin-top:14px}
+.txn-item{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);animation:fadeUp .3s ease}
+.txn-item:last-child{border:none}
+.txn-left{flex:1;min-width:0}
+.txn-amount{font-family:'Space Mono',monospace;font-size:14px;font-weight:700}
+.txn-meta{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.txn-badge{font-size:10px;font-weight:700;letter-spacing:.5px;padding:3px 9px;border-radius:20px;text-transform:uppercase;flex-shrink:0;margin-left:10px}
+.badge-approved{background:rgba(0,224,150,.12);color:var(--success);border:1px solid rgba(0,224,150,.3)}
+.badge-blocked{background:rgba(255,69,96,.12);color:var(--danger);border:1px solid rgba(255,69,96,.3)}
+
+.empty-state{text-align:center;padding:28px 0;color:var(--muted);font-size:13px}
+.refresh-btn{background:none;border:1px solid var(--border);color:var(--muted);font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'Space Mono',monospace;transition:color .2s,border-color .2s}
+.refresh-btn:hover{color:var(--accent);border-color:var(--accent)}
+
+.ml-tag{font-size:10px;background:rgba(0,102,255,.15);color:var(--accent);border:1px solid rgba(0,102,255,.3);padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle}
+
+.balance-chip{display:inline-flex;align-items:center;gap:6px;font-family:'Space Mono',monospace;font-size:13px;color:var(--success);background:rgba(0,224,150,.08);border:1px solid rgba(0,224,150,.25);padding:4px 12px;border-radius:20px;margin-bottom:16px}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+/* Balance PIN modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);z-index:200;display:flex;align-items:center;justify-content:center;animation:fadeIn .2s ease}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:36px 32px;width:340px;box-shadow:0 0 60px rgba(0,212,255,.1);text-align:center;animation:fadeUp .3s ease}
+.modal-icon{font-size:40px;margin-bottom:14px}
+.modal-title{font-size:17px;font-weight:700;margin-bottom:6px}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:22px}
+.pin-input{width:100%;padding:12px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:22px;font-family:'Space Mono',monospace;letter-spacing:8px;text-align:center;outline:none;transition:border-color .2s}
+.pin-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,212,255,.1)}
+.pin-error{font-size:12px;color:var(--danger);margin-top:8px;min-height:16px}
+.modal-btns{display:flex;gap:10px;margin-top:18px}
+.btn-reveal{flex:1;padding:11px;background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff;border:none;border-radius:10px;font-family:'Space Mono',monospace;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;transition:opacity .2s}
+.btn-reveal:hover{opacity:.9}
+.btn-cancel{padding:11px 16px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:10px;font-size:12px;cursor:pointer;transition:color .2s,border-color .2s}
+.btn-cancel:hover{color:var(--text);border-color:var(--text)}
+
+/* Balance locked state */
+.balance-locked{display:inline-flex;align-items:center;gap:8px;cursor:pointer;transition:opacity .2s}
+.balance-locked:hover{opacity:.8}
+.lock-icon{font-size:18px}
+.balance-hidden-text{font-family:'Space Mono',monospace;font-size:22px;font-weight:700;color:var(--warn);letter-spacing:3px}
+.reveal-hint{font-size:10px;color:var(--accent);letter-spacing:1px;margin-top:2px;text-transform:uppercase}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">💳 Secure<span>Card</span></div>
+  <div class="nav-right">
+    <div class="card-badge" id="cardBadge">Loading...</div>
+    <a href="/logout" class="logout-btn">Sign Out</a>
+  </div>
+</nav>
+
+<div class="main">
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Balance</div>
+      <div id="statBal">
+        <div class="balance-locked" onclick="openPinModal()" title="Click to reveal balance">
+          <span class="lock-icon">🔒</span>
+          <div>
+            <div class="balance-hidden-text">••••••</div>
+            <div class="reveal-hint">Click to reveal</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Transactions</div>
+      <div class="stat-value blue" id="statTotal">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Approved</div>
+      <div class="stat-value green" id="statOk">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Blocked</div>
+      <div class="stat-value red" id="statBlocked">—</div>
+    </div>
+  </div>
+
+  <!-- Transaction form -->
+  <div class="txn-panel">
+    <div class="panel-title">New Transaction <span class="ml-tag">XGBoost ML</span></div>
+    <div class="panel-sub">Protected by 8-feature fraud detection model + 5 rule-based checks</div>
+
+    <div id="balChip" class="balance-chip" onclick="openPinModal()" style="cursor:pointer" title="Click to reveal balance">🔒 Balance: Hidden — click to reveal</div>
+
+    <div class="field">
+      <label>Amount (₹)</label>
+      <input type="number" id="amount" placeholder="0.00" min="1">
+    </div>
+
+    <div class="field">
+      <label>Transaction Type</label>
+      <select id="txnType">
+        <option value="TRANSFER">Transfer</option>
+        <option value="PAYMENT">Payment</option>
+        <option value="CASH_OUT">Cash Out</option>
+        <option value="DEBIT">Debit</option>
+        <option value="CASH_IN">Cash In</option>
+      </select>
+    </div>
+
+    <button class="btn" id="txnBtn" onclick="analyzeTransaction()">→ ANALYZE TRANSACTION</button>
+
+    <div class="result-box" id="result">
+      <div class="result-status" id="resStatus"></div>
+      <div class="result-reason" id="resReason"></div>
+
+      <div class="ml-bar-wrap">
+        <div class="ml-bar-label">ML Fraud Probability</div>
+        <div class="ml-bar-bg"><div class="ml-bar-fill" id="mlBar"></div></div>
+        <div style="font-size:11px;margin-top:3px;opacity:.6" id="mlPct"></div>
+      </div>
+
+      <ul class="flags-list" id="flagsList"></ul>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="history-panel">
+    <div class="panel-header">
+      <div>
+        <div class="panel-title">Transaction History</div>
+        <div class="panel-sub" style="margin-bottom:0">Last 30 transactions</div>
+      </div>
+      <button class="refresh-btn" onclick="loadAll()">↻ Refresh</button>
+    </div>
+    <div class="txn-list" id="txnList"><div class="empty-state">Loading...</div></div>
+  </div>
+
+</div>
+
+<!-- Balance PIN Modal -->
+<div class="modal-overlay" id="pinModal" style="display:none" onclick="handleOverlayClick(event)">
+  <div class="modal-box">
+    <div class="modal-icon">🔐</div>
+    <div class="modal-title">Enter Balance PIN</div>
+    <div class="modal-sub">Your balance is protected. Enter your PIN to view it.</div>
+    <input class="pin-input" type="password" id="pinInput" maxlength="6" inputmode="numeric"
+           placeholder="••••" onkeydown="if(event.key==='Enter')submitPin()">
+    <div class="pin-error" id="pinError"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closePinModal()">Cancel</button>
+      <button class="btn-reveal" onclick="submitPin()">🔓 Reveal Balance</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentBalance = null; // null = hidden, number = revealed
+
+// ── PIN MODAL ────────────────────────────────────────────────────────────────
+function openPinModal() {
+  document.getElementById('pinInput').value = '';
+  document.getElementById('pinError').textContent = '';
+  document.getElementById('pinModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('pinInput').focus(), 80);
+}
+
+function closePinModal() {
+  document.getElementById('pinModal').style.display = 'none';
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('pinModal')) closePinModal();
+}
+
+async function submitPin() {
+  const pin = document.getElementById('pinInput').value.trim();
+  const errEl = document.getElementById('pinError');
+  if (!pin) { errEl.textContent = 'Please enter your PIN.'; return; }
+
+  const res = await fetch('/verify_balance_pin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin })
+  });
+  const data = await res.json();
+
+  if (data.success) {
+    currentBalance = data.balance;
+    renderBalance(data.balance);
+    closePinModal();
+  } else {
+    errEl.textContent = data.message || 'Incorrect PIN. Try again.';
+    document.getElementById('pinInput').value = '';
+    document.getElementById('pinInput').focus();
+  }
+}
+
+function renderBalance(balance) {
+  const fmt = '₹' + Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  document.getElementById('statBal').innerHTML = `<div class="stat-value gold">${fmt}</div>`;
+  const chip = document.getElementById('balChip');
+  chip.textContent = '💰 Balance: ' + fmt;
+  chip.style.cursor = 'default';
+  chip.onclick = null;
+  chip.title = '';
+}
+
+function lockBalance() {
+  currentBalance = null;
+  document.getElementById('statBal').innerHTML = `
+    <div class="balance-locked" onclick="openPinModal()" title="Click to reveal updated balance">
+      <span class="lock-icon">🔒</span>
+      <div>
+        <div class="balance-hidden-text">••••••</div>
+        <div class="reveal-hint">Updated — reveal again</div>
+      </div>
+    </div>`;
+  const chip = document.getElementById('balChip');
+  chip.textContent = '🔒 Balance: Hidden — click to reveal';
+  chip.style.cursor = 'pointer';
+  chip.onclick = openPinModal;
+  chip.title = 'Click to reveal balance';
+}
+
+// ── LOAD ALL ─────────────────────────────────────────────────────────────────
+async function loadAll() {
+  const me = await fetch('/me').then(r => r.json());
+  if (me.card) {
+    document.getElementById('cardBadge').textContent = '****' + me.card.slice(-4);
+    if (currentBalance !== null) renderBalance(currentBalance);
+  }
+
+  const data = await fetch('/transactions').then(r => r.json());
+  document.getElementById('statTotal').textContent = data.length;
+  document.getElementById('statOk').textContent = data.filter(t => t.status === 'Approved').length;
+  document.getElementById('statBlocked').textContent = data.filter(t => t.status === 'Blocked').length;
+
+  const list = document.getElementById('txnList');
+  if (!data.length) { list.innerHTML = '<div class="empty-state">No transactions yet</div>'; return; }
+
+  list.innerHTML = data.map(t => {
+    const dt = new Date(t.timestamp + 'Z');
+    const timeStr = dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) + ' ' +
+                    dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const isOk = t.status === 'Approved';
+    const mlPct = t.ml_probability != null ? ` · ML ${(t.ml_probability * 100).toFixed(0)}%` : '';
+    return `
+      <div class="txn-item">
+        <div class="txn-left">
+          <div class="txn-amount">₹${Number(t.amount).toLocaleString('en-IN')}</div>
+          <div class="txn-meta">${t.txn_type} · ${t.reason}${mlPct} · ${timeStr}</div>
+        </div>
+        <span class="txn-badge ${isOk ? 'badge-approved' : 'badge-blocked'}">${isOk ? '✓ OK' : '✕ Blocked'}</span>
+      </div>`;
+  }).join('');
+}
+
+// ── ANALYZE TRANSACTION ──────────────────────────────────────────────────────
+async function analyzeTransaction() {
+  const amount = parseFloat(document.getElementById('amount').value);
+  const txnType = document.getElementById('txnType').value;
+
+  if (!amount || amount <= 0) { showResult(false, 'Enter a valid amount', [], 0); return; }
+
+  const btn = document.getElementById('txnBtn');
+  btn.disabled = true; btn.textContent = '⏳ Scanning...';
+  document.getElementById('result').style.display = 'none';
+
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const res = await fetch('/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: txnType, amount,
+        lat: pos.coords.latitude,
+        lon: pos.coords.longitude
+      })
+    });
+    const data = await res.json();
+
+    btn.disabled = false; btn.textContent = '→ ANALYZE TRANSACTION';
+    showResult(data.status === 'Approved', data.reason, data.flags || [], data.ml_probability || 0);
+
+    // Lock balance after any transaction — user must re-enter PIN to see updated amount
+    lockBalance();
+    loadAll();
+  }, () => {
+    btn.disabled = false; btn.textContent = '→ ANALYZE TRANSACTION';
+    showResult(false, 'Location access required — please allow and retry', [], 0);
+  });
+}
+
+function showResult(ok, reason, flags, mlPct) {
+  const box = document.getElementById('result');
+  document.getElementById('resStatus').textContent = ok ? '✓ Transaction Approved' : '✕ Transaction Blocked';
+  document.getElementById('resReason').textContent = reason;
+
+  const bar = document.getElementById('mlBar');
+  const pctEl = document.getElementById('mlPct');
+  const pct = Math.min(mlPct, 100);
+  bar.style.width = pct + '%';
+  bar.style.background = pct < 30 ? 'var(--success)' : pct < 65 ? 'var(--warn)' : 'var(--danger)';
+  pctEl.textContent = pct.toFixed(1) + '% fraud probability';
+
+  const fl = document.getElementById('flagsList');
+  fl.innerHTML = flags.length ? flags.map(f => `<li>${f}</li>`).join('') : '';
+
+  box.className = 'result-box ' + (ok ? 'result-ok' : 'result-fail');
+  box.style.display = 'block';
+}
+
+loadAll();
+</script>
+</body>
+</html>
