@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>SecureCard — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#050a14;--card:#0c1628;--border:#1a2d50;--accent:#00d4ff;--accent2:#0066ff;--danger:#ff4560;--text:#e2eaf7;--muted:#5a7a9e}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);font-family:'Sora',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;color:var(--text)}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:40px;width:380px}
+h2{font-size:22px;margin-bottom:6px}.sub{color:var(--muted);font-size:13px;margin-bottom:24px}
+.field{margin-bottom:16px}label{display:block;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+input{width:100%;padding:12px 14px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;outline:none}
+input:focus{border-color:var(--accent)}
+.btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff;border:none;border-radius:10px;font-family:'Space Mono',monospace;font-weight:700;letter-spacing:1px;cursor:pointer;margin-top:8px}
+.err{margin-top:14px;padding:11px;border-radius:8px;font-size:13px;display:none;background:rgba(255,69,96,.1);border:1px solid rgba(255,69,96,.3);color:var(--danger)}
+.note{margin-top:16px;font-size:12px;color:var(--muted);line-height:1.5}
+.note a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="panel">
+  <h2>🛡️ Admin Panel</h2>
+  <p class="sub">Sign in to view users, logins, and all transactions.</p>
+  {% if not admin_configured %}
+  <div class="err" style="display:block">Admin is not configured. Set ADMIN_PASSWORD in the environment (on Render: service &gt; Environment) and redeploy, then try again.</div>
+  {% endif %}
+  <div class="field"><label>Admin username</label><input id="username" value="admin" placeholder="admin"></div>
+  <div class="field"><label>Admin password</label><input id="password" type="password" placeholder="Admin password"></div>
+  <button class="btn" onclick="adminLogin()">→ ADMIN SIGN IN</button>
+  <div class="err" id="errMsg"></div>
+  <p class="note">This password is never stored in the code or repo. It comes only from the ADMIN_PASSWORD environment variable. <a href="/">Back to user login</a></p>
+</div>
+<script>
+async function adminLogin(){
+  const err=document.getElementById('errMsg'); err.style.display='none';
+  const res=await fetch('/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('username').value.trim(),password:document.getElementById('password').value})});
+  const data=await res.json();
+  if(data.success){ window.location.href='/admin'; } else { err.textContent=data.message||'Invalid admin credentials.'; err.style.display='block'; }
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Enter') adminLogin(); });
+</script>
+</body>
+</html>

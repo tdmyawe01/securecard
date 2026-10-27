@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>SecureCard — Admin Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#050a14;--surface:#0c1628;--border:#1a2d50;--accent:#00d4ff;--accent2:#0066ff;--danger:#ff4560;--success:#00e096;--warn:#ffb800;--text:#e2eaf7;--muted:#5a7a9e}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);font-family:'Sora',sans-serif;color:var(--text);min-height:100vh}
+nav{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;padding:0 24px;height:56px;background:rgba(5,10,20,.95);border-bottom:1px solid var(--border)}
+nav a{color:var(--muted);text-decoration:none;font-size:12px;border:1px solid var(--border);padding:5px 12px;border-radius:6px}
+.main{max-width:1100px;margin:28px auto;padding:0 20px}
+h1{font-size:22px;margin-bottom:4px}.sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px}
+.stat b{font-family:'Space Mono',monospace;font-size:22px;display:block}.stat span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:20px;overflow-x:auto}
+.panel h2{font-size:15px;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:700px}
+th{text-align:left;color:var(--muted);font-size:11px;letter-spacing:1px;text-transform:uppercase;padding:8px;border-bottom:1px solid var(--border)}
+td{padding:8px;border-bottom:1px solid var(--border);vertical-align:top}
+.badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;text-transform:uppercase}
+.ok{background:rgba(0,224,150,.12);color:var(--success)}.bad{background:rgba(255,69,96,.12);color:var(--danger)}.warn{background:rgba(255,184,0,.12);color:var(--warn)}
+form.inline{display:inline}button.small{padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-size:12px}
+button.danger{color:var(--danger);border-color:rgba(255,69,96,.4)}
+.search{display:flex;gap:10px;margin-bottom:20px}
+.search input{flex:1;padding:11px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px}
+.search button{padding:11px 18px;background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700}
+.exports a{color:var(--accent);text-decoration:none;margin-right:14px;font-size:13px}
+.mono{font-family:'Space Mono',monospace}
+@media(max-width:800px){.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<nav><div>🛡️ SecureCard <b>Admin</b> — {{ admin_user }}</div><div><a href="/admin/export?type=users">Export users</a> &nbsp; <a href="/admin/logout">Sign out</a></div></nav>
+<div class="main">
+  <h1>Admin overview</h1>
+  <p class="sub">Every account, every login, and every transaction in one place. Card numbers are masked except for the last 4 digits. Accounts are saved in the database, so a user who registers can log in directly next time — until the service is redeployed on Render's free tier, which resets the local SQLite file (see note below).</p>
+
+  <div class="stats">
+    <div class="stat"><b>{{ stats.total_users }}</b><span>Total users</span></div>
+    <div class="stat"><b>{{ stats.active_users }}</b><span>Active users</span></div>
+    <div class="stat"><b>{{ stats.total_txns }}</b><span>Transactions</span></div>
+    <div class="stat"><b>{{ stats.approved }} / {{ stats.blocked }}</b><span>Approved / Blocked</span></div>
+    <div class="stat"><b>{{ stats.total_logins }}</b><span>Successful logins</span></div>
+    <div class="stat"><b>₹{{ "{:,.0f}".format(stats.approved_amount) }}</b><span>Approved amount</span></div>
+    <div class="stat"><b>₹{{ "{:,.0f}".format(stats.blocked_amount) }}</b><span>Blocked amount</span></div>
+    <div class="stat"><b>{{ stats.failed_logins }}</b><span>Failed logins</span></div>
+    <div class="stat"><b>{{ stats.new_users_7d }}</b><span>New users (7 days)</span></div>
+    <div class="stat"><b>{{ fraud_reasons|length }}</b><span>Block reasons</span></div>
+  </div>
+
+  <form class="search" method="get" action="/admin">
+    <input name="q" value="{{ q }}" placeholder="Search by card number or email…">
+    <button type="submit">Search</button>
+    {% if q %}<a href="/admin" style="align-self:center;color:var(--muted);font-size:13px">Clear</a>{% endif %}
+  </form>
+
+  <div class="panel">
+    <h2>Top block reasons</h2>
+    {% if fraud_reasons %}
+    <table><tr><th>Reason</th><th>Count</th></tr>
+    {% for r in fraud_reasons %}<tr><td>{{ r.reason }}</td><td>{{ r.c }}</td></tr>{% endfor %}
+    </table>
+    {% else %}<p style="color:var(--muted);font-size:13px">No blocked transactions yet.</p>{% endif %}
+  </div>
+
+  <div class="panel">
+    <h2>Users {% if q %}(matching “{{ q }}”){% else %}(latest 20){% endif %}</h2>
+    <div class="exports"><a href="/admin/export?type=users">↓ Export users CSV</a></div><br>
+    <table><tr><th>Card</th><th>Email</th><th>Balance</th><th>Status</th><th>Created</th><th>Action</th></tr>
+    {% for u in users %}
+    <tr>
+      <td class="mono">{{ u.masked }}</td><td>{{ u.email }}</td><td>₹{{ "{:,.2f}".format(u.balance) }}</td>
+      <td><span class="badge {{ 'ok' if (u.status in (none,'active')) else 'bad' }}">{{ u.status or 'active' }}</span></td>
+      <td>{{ u.created_at }}</td>
+      <td>
+        <form class="inline" method="post" action="/admin/user_action"><input type="hidden" name="card" value="{{ u.card_number }}"><input type="hidden" name="action" value="deactivate"><button class="small" type="submit">Deactivate</button></form>
+        <form class="inline" method="post" action="/admin/user_action"><input type="hidden" name="card" value="{{ u.card_number }}"><input type="hidden" name="action" value="reactivate"><button class="small" type="submit">Reactivate</button></form>
+        <form class="inline" method="post" action="/admin/user_action" onsubmit="return confirm('Delete this user and all their transactions and login records? This cannot be undone.');"><input type="hidden" name="card" value="{{ u.card_number }}"><input type="hidden" name="action" value="delete"><button class="small danger" type="submit">Delete</button></form>
+      </td>
+    </tr>
+    {% else %}<tr><td colspan="6" style="color:var(--muted)">No users found.</td></tr>{% endfor %}
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2>All transactions (latest 50)</h2>
+    <div class="exports"><a href="/admin/export?type=transactions">↓ Export transactions CSV</a></div><br>
+    <table><tr><th>Card</th><th>Amount</th><th>Type</th><th>Status</th><th>Reason</th><th>Time</th></tr>
+    {% for t in txns %}
+    <tr><td class="mono">{{ t.masked }}</td><td>₹{{ "{:,.2f}".format(t.amount) }}</td><td>{{ t.txn_type }}</td>
+    <td><span class="badge {{ 'ok' if t.status=='Approved' else 'bad' }}">{{ t.status }}</span></td><td>{{ t.reason }}</td><td>{{ t.timestamp }}</td></tr>
+    {% else %}<tr><td colspan="6" style="color:var(--muted)">No transactions yet.</td></tr>{% endfor %}
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2>Who logged in — login &amp; account events (latest 50)</h2>
+    <div class="exports"><a href="/admin/export?type=logins">↓ Export login events CSV</a></div><br>
+    <table><tr><th>Card / User</th><th>Email</th><th>Event</th><th>IP</th><th>Time</th></tr>
+    {% for e in logins %}
+    <tr><td class="mono">{{ e.masked }}</td><td>{{ e.email }}</td>
+    <td><span class="badge {{ 'ok' if 'success' in e.event or 'created' in e.event else 'warn' if 'failed' in e.event else 'bad' }}">{{ e.event }}</span></td>
+    <td>{{ e.ip_address }}</td><td>{{ e.timestamp }}</td></tr>
+    {% else %}<tr><td colspan="5" style="color:var(--muted)">No login events yet. Events are recorded from now on — older accounts made before this update will show from their next login.</td></tr>{% endfor %}
+    </table>
+    <p style="color:var(--muted);font-size:12px;margin-top:12px">Events recorded: account_created, login_success, login_failed, login_blocked_deactivated, logout, admin_login_success, admin_login_failed, admin_deactivate, admin_reactivate, admin_delete.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Persistence note</h2>
+    <p style="font-size:13px;line-height:1.6;color:var(--muted)">Accounts are saved in SQLite, so a registered user can log in directly next time on the same deployment. On Render's free tier, the local SQLite file resets when the service is redeployed or restarted with a fresh filesystem — that is a Render free-tier limit, not an admin-panel bug. For permanent accounts across redeploys, move the database to Postgres or add a paid Render Disk later.</p>
+  </div>
+</div>
+</body>
+</html>
